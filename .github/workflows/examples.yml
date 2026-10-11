@@ -1,0 +1,22 @@
+name: Deploy examples
+
+# reo-deploy 自身のサンプルを公開して動作確認する
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["examples/**"]
+
+jobs:
+  static:
+    uses: ./.github/workflows/deploy.yml
+    with:
+      name: reo-deploy-static-example
+      root_dir: examples/static-site
+    secrets: inherit
+  dynamic:
+    uses: ./.github/workflows/deploy.yml
+    with:
+      name: reo-deploy-dynamic-example
+      root_dir: examples/dynamic-site
+    secrets: inherit
