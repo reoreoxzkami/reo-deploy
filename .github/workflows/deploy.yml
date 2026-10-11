@@ -96,6 +96,7 @@ jobs:
           npx --yes wrangler@4 deploy --config "${{ steps.prep.outputs.config }}" 2>&1 | tee deploy.log
           URL=$(grep -oE 'https://[a-zA-Z0-9.-]+\.workers\.dev' deploy.log | head -1 || true)
           echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "::notice title=公開URL::${URL:-（URLを取得できませんでした。ログを確認してください）}"
           echo "### 🚀 公開しました（${{ steps.prep.outputs.mode }}）" >> "$GITHUB_STEP_SUMMARY"
           echo "$URL" >> "$GITHUB_STEP_SUMMARY"
 
