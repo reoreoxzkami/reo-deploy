@@ -1,0 +1,97 @@
+name: reo-deploy
+
+# 他のリポジトリから呼び出して使う「デプロイサービス本体」
+on:
+  workflow_call:
+    inputs:
+      name:
+        description: "公開名（Worker名・URLになる）。省略時はリポジトリ名"
+        type: string
+        default: ""
+      build_command:
+        description: "ビルドコマンド。省略時は package.json の build を自動実行"
+        type: string
+        default: ""
+      output_dir:
+        description: "ビルド結果のフォルダ"
+        type: string
+        default: "dist"
+      node_version:
+        type: string
+        default: "20"
+    secrets:
+      CLOUDFLARE_API_TOKEN:
+        required: true
+      CLOUDFLARE_ACCOUNT_ID:
+        required: true
+    outputs:
+      url:
+        description: "公開URL"
+        value: ${{ jobs.deploy.outputs.url }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    outputs:
+      url: ${{ steps.deploy.outputs.url }}
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: サイトを取得
+        uses: actions/checkout@v4
+
+      - name: reo-deploy を取得
+        uses: actions/checkout@v4
+        with:
+          repository: reoreoxzkami/reo-deploy
+          path: .reo-deploy
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node_version }}
+
+      - name: 依存関係をインストール
+        run: |
+          if [ -f pnpm-lock.yaml ]; then corepack enable && pnpm install --frozen-lockfile
+          elif [ -f yarn.lock ]; then corepack enable && yarn install --frozen-lockfile
+          elif [ -f package-lock.json ]; then npm ci
+          elif [ -f package.json ]; then npm install
+          else echo "package.json なし: スキップ"; fi
+
+      - name: ビルド
+        run: |
+          if [ -n "${{ inputs.build_command }}" ]; then
+            ${{ inputs.build_command }}
+          elif [ -f package.json ] && node -e "process.exit(require('./package.json').scripts?.build?0:1)"; then
+            npm run build
+          else
+            echo "ビルド不要"
+          fi
+
+      - name: サイトの種類を判定
+        id: prep
+        run: |
+          NAME="${{ inputs.name }}"
+          [ -z "$NAME" ] && NAME="${GITHUB_REPOSITORY#*/}"
+          bash .reo-deploy/scripts/prepare.sh "$NAME" "${{ inputs.output_dir }}"
+          rm -rf .reo-deploy
+
+      - name: 本番へデプロイ
+        id: deploy
+        if: github.event_name != 'pull_request'
+        run: |
+          npx --yes wrangler@4 deploy --config "${{ steps.prep.outputs.config }}" 2>&1 | tee deploy.log
+          URL=$(grep -oE 'https://[a-zA-Z0-9.-]+\.workers\.dev' deploy.log | head -1 || true)
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "### 🚀 公開しました（${{ steps.prep.outputs.mode }}）" >> "$GITHUB_STEP_SUMMARY"
+          echo "$URL" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: プレビューを作成（PR）
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        run: |
+          npx --yes wrangler@4 versions upload --config "${{ steps.prep.outputs.config }}" \
+            --preview-alias "pr-${{ github.event.number }}" 2>&1 | tee preview.log
+          echo "### 👀 プレビュー" >> "$GITHUB_STEP_SUMMARY"
+          grep -oE 'https://[a-zA-Z0-9.-]+\.workers\.dev' preview.log | sort -u >> "$GITHUB_STEP_SUMMARY" || true
