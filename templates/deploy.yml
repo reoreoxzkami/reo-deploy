@@ -1,0 +1,20 @@
+# このファイルを、公開したいサイトのリポジトリに
+# .github/workflows/deploy.yml として置くだけでOK
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    uses: reoreoxzkami/reo-deploy/.github/workflows/deploy.yml@main
+    with:
+      # name: my-site          # 公開名（省略でリポジトリ名）
+      # build_command: npm run build
+      output_dir: dist
+    secrets:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
