@@ -71,7 +71,7 @@ fi
 
 # ルートを丸ごと公開する場合は、リポジトリの裏側を出さない
 if [ "$ASSETS" = "." ]; then
-  printf '.git\n.github\n.wrangler\n.assetsignore\nnode_modules\n.reo-wrangler.json\n*.md\n' > .assetsignore
+  printf '.git\n.reo-deploy\n.github\n.wrangler\n.assetsignore\nnode_modules\n.reo-wrangler.json\n*.md\n' > .assetsignore
 fi
 
 echo "mode=$MODE" >> "${GITHUB_OUTPUT:-/dev/null}"
